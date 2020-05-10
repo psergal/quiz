@@ -1,0 +1,9 @@
+telegram~=0.0.1
+requests~=2.22.0
+python-dotenv~=0.10.1
+python-telegram-bot[socks]~=12.6.1
+pathlib==1.0.1
+vk_api==11.6.0
+dialogflow==0.7.2
+requests~=2.22.0
+redis~=3.4.1

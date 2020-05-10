@@ -1,0 +1,6 @@
+.env
+*.log
+/.idea
+/arc
+/images
+questions.json
