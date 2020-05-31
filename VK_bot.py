@@ -17,7 +17,7 @@ logger = logging.getLogger("bot_logger")
 
 def quiz():
     p = Path('.')
-    quiz_path = p / 'arc' / 'quiz-questions'
+    quiz_path = p / 'quiz-questions'
     quiz_files = list(quiz_path.glob('*.*'))
     quiz_file = random.choice(quiz_files)
     quiz_lines = quiz_file.read_text(encoding='KOI8-R').splitlines()
@@ -27,17 +27,17 @@ def quiz():
     for quiz_question in quiz_questions:
         founded_question, founded_answer = '', ''
         q_flag = True
-        for quiz_line in quiz_lines[quiz_question::]:
-            if quiz_line and q_flag:
-                founded_question = founded_question + quiz_line + '\n'
+        for each_quiz_line in quiz_lines[quiz_question::]:
+            if each_quiz_line and q_flag:
+                founded_question = founded_question + each_quiz_line + '\n'
             elif q_flag:
                 q_flag = False
                 continue
-            if quiz_line and not q_flag:
-                if quiz_line.startswith('Ответ:'):
+            if each_quiz_line and not q_flag:
+                if each_quiz_line.startswith('Ответ:'):
                     continue
-                founded_answer = founded_answer + quiz_line + '\n'
-            elif not quiz_line and not q_flag:
+                founded_answer = founded_answer + each_quiz_line + '\n'
+            elif not each_quiz_line and not q_flag:
                 break
         quiz_questions[quiz_question] = [quiz_questions.get(quiz_question), {'q': founded_question, 'a': founded_answer}]
     return quiz_questions
@@ -47,15 +47,16 @@ if __name__ == "__main__":
     load_dotenv()
     service_tlg_token = os.environ['SVC_TLG_TOKEN']
     service_chat_id = os.environ['TLG_CHAT_ID']
+    vk_api_key = os.environ['VK_API']
+    vk_group_id = os.environ['VK_GROUP']
+    redis_password = os.environ['REDIS_PASSWORD']
+    redis_port = os.environ['REDIS_PORT']
+
     logger_config = TG_log_class.create_logger_config(service_tlg_token, service_chat_id, __file__)
     logging.config.dictConfig(logger_config)
 
-    vk_api_key = os.environ['VK_API']
-    vk_group_id = os.environ['VK_GROUP']
-
-    redis_password = os.environ['REDIS_PASSWORD']
     r_client = redis.Redis(host='redis-12388.c52.us-east-1-4.ec2.cloud.redislabs.com',
-                           port=12388, password=redis_password,
+                           port=redis_port, password=redis_password,
                            charset="utf-8", decode_responses=True, )
     r_client.flushdb()
 

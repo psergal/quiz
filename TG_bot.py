@@ -17,7 +17,7 @@ markup = Add_Rkm(reply_keyboard, one_time_keyboard=True)
 
 def quiz():
     p = Path('.')
-    quiz_path = p / 'arc' / 'quiz-questions'
+    quiz_path = p / 'quiz-questions'
     quiz_files = list(quiz_path.glob('*.*'))
     quiz_file = random.choice(quiz_files)
     quiz_lines = quiz_file.read_text(encoding='KOI8-R').splitlines()
@@ -158,12 +158,13 @@ if __name__ == '__main__':
     service_tlg_token = os.environ['SVC_TLG_TOKEN']
     service_chat_id = os.environ['TLG_CHAT_ID']
     redis_password = os.environ['REDIS_PASSWORD']
+    redis_port = os.environ['REDIS_PORT']
     quiz = quiz()
     logger_config = TG_log_class.create_logger_config(service_tlg_token, service_chat_id, __file__)
 
     logging.config.dictConfig(logger_config)
     r_client = redis.Redis(host='redis-12388.c52.us-east-1-4.ec2.cloud.redislabs.com',
-                           port=12388, password=redis_password,
+                           port=redis_port, password=redis_password,
                            charset="utf-8", decode_responses=True, )
     r_client.flushdb()
     call_bot(tlg_token, r_client)
