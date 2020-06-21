@@ -1,46 +1,19 @@
-import os
 from dotenv import load_dotenv
-from telegram.ext import (Updater, CallbackContext, CommandHandler, MessageHandler, Filters, ConversationHandler)
-from telegram import (ReplyKeyboardMarkup as Add_Rkm, ReplyKeyboardRemove as Del_Rkm, Update)
-
-from pathlib import Path
+import logging.config
+import os
 import random
 import redis
-import logging.config
-import TG_log_class
+
+from telegram.ext import Updater, CallbackContext, CommandHandler, MessageHandler, Filters, ConversationHandler
+from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove, Update
+import tg_log_class
+from utils import get_args, get_quiz_questions
 
 logger = logging.getLogger("bot_logger")
 
-CHOOSE_QUEST, TYPING_REPLY, CHOOSE_SURRENDER   = range(3)
+CHOOSE_QUEST, TYPING_REPLY, CHOOSE_SURRENDER = range(3)
 reply_keyboard = [['Новый вопрос', 'Сдаться'], ['Мой счет']]
-markup = Add_Rkm(reply_keyboard, one_time_keyboard=True)
-
-def quiz():
-    p = Path('.')
-    quiz_path = p / 'quiz-questions'
-    quiz_files = list(quiz_path.glob('*.*'))
-    quiz_file = random.choice(quiz_files)
-    quiz_lines = quiz_file.read_text(encoding='KOI8-R').splitlines()
-    quiz_questions = {line_number: quiz_line
-                      for line_number, quiz_line in enumerate(quiz_lines, start=1)
-                      if quiz_line.startswith('Вопрос') and quiz_line.endswith(':')}
-    for quiz_question in quiz_questions:
-        question, answer = '', ''
-        q_flag = True
-        for quiz_line in quiz_lines[quiz_question::]:
-            if quiz_line and q_flag:
-                question = question + quiz_line + '\n'
-            elif q_flag:
-                q_flag = False
-                continue
-            if quiz_line and not q_flag:
-                if quiz_line.startswith('Ответ:'):
-                    continue
-                answer = answer + quiz_line + '\n'
-            elif not quiz_line and not q_flag:
-                break
-        quiz_questions[quiz_question] = [quiz_questions.get(quiz_question), {'q': question, 'a': answer}]
-    return quiz_questions
+markup = ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True)
 
 
 def quiz_callback(update: Update, context):
@@ -57,7 +30,7 @@ def quiz_callback(update: Update, context):
         context.bot.send_message(chat_id=update.message.chat_id, text=answer)
         client_redis.delete(update.effective_user.id, 0, -1)
         update.message.reply_text('Bye! I hope we can talk again some day.',
-                                  reply_markup=Del_Rkm())
+                                  reply_markup=ReplyKeyboardRemove())
     else:
         answer = client_redis.lrange(update.effective_user.id, -1, -1)[0]
         if update.message.text.lower() in answer.lower():
@@ -68,7 +41,7 @@ def quiz_callback(update: Update, context):
         context.bot.send_message(chat_id=update.message.chat_id, text='Неправильно\n Попробуешь ещё раз?"')
 
 
-def start(update: Update, context: CallbackContext):
+def start_quiz(update: Update, context: CallbackContext):
     context.bot.send_message(chat_id=update.message.chat_id, text="I'm a quiz bot, Let's play with me!",
                              reply_markup=markup)
     return CHOOSE_QUEST
@@ -120,7 +93,7 @@ def handle_score(update: Update, context):
     return ConversationHandler.END
 
 
-def error(update: Update, context):
+def log_error(update: Update, context):
     """Log Errors caused by Updates."""
     logger.warning('Update "%s" caused error "%s"', update, context.error, extra={'Update_err': True})
 
@@ -129,8 +102,8 @@ def call_bot(telegram_token, redis_cnn):
     updater = Updater(token=telegram_token, use_context=True)
     dispatcher = updater.dispatcher
     dispatcher.bot_data = {'r': redis_cnn}
-    conv_handler = ConversationHandler(
-        entry_points=[CommandHandler('start', start)],
+    conversation_handler = ConversationHandler(
+        entry_points=[CommandHandler('start', start_quiz)],
 
         states={
             CHOOSE_QUEST: [MessageHandler(Filters.regex('^Новый вопрос$'), handle_new_question_request),
@@ -145,26 +118,28 @@ def call_bot(telegram_token, redis_cnn):
         fallbacks=[MessageHandler(Filters.regex('^Мой счет$'), handle_score)]
     )
 
-    dispatcher.add_handler(conv_handler)
-    dispatcher.add_error_handler(error)
+    dispatcher.add_handler(conversation_handler)
+    dispatcher.add_error_handler(log_error)
     updater.start_polling()
 
     updater.idle()
 
 
 if __name__ == '__main__':
+    args = get_args()
+    memcached_server = args.memcached_server
+    memcached_charset = args.memcached_charset
     load_dotenv()
     tlg_token = os.environ['TLG_TOKEN']
     service_tlg_token = os.environ['SVC_TLG_TOKEN']
     service_chat_id = os.environ['TLG_CHAT_ID']
     redis_password = os.environ['REDIS_PASSWORD']
     redis_port = os.environ['REDIS_PORT']
-    quiz = quiz()
-    logger_config = TG_log_class.create_logger_config(service_tlg_token, service_chat_id, __file__)
+    quiz = get_quiz_questions()
+    logger_config = tg_log_class.create_logger_config(service_tlg_token, service_chat_id, __file__)
 
     logging.config.dictConfig(logger_config)
-    r_client = redis.Redis(host='redis-12388.c52.us-east-1-4.ec2.cloud.redislabs.com',
-                           port=redis_port, password=redis_password,
-                           charset="utf-8", decode_responses=True, )
-    r_client.flushdb()
-    call_bot(tlg_token, r_client)
+    redis_client = redis.Redis(host=memcached_server, port=redis_port, password=redis_password,
+                               charset=memcached_charset, decode_responses=True, )
+    redis_client.flushdb()
+    call_bot(tlg_token, redis_client)

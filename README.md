@@ -19,6 +19,8 @@ Create [VK](vk.com) account, public group and get VK_API token.
 Follow instructions on page `https://vk.com/club<your_vk_id>?act=tokens`
 Store somewhere API key, Group id  
 ## Redis
+By default both modules use RedisLabs server for caching questions and answer.
+But you can set on your own server via `--memcached_server` and `--memcached_charset` arguments.
 You will needed to save user activity in a key-value DB Redis.
 Sign up [Redis Labs](https://redislabs.com/) and get the port number and the password for your database
 ## Environment setting  
